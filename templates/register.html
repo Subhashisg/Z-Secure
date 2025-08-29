@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Register - EncryptPro v2{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header text-center bg-primary text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-user-plus me-2"></i>Create Account
+                </h3>
+                <p class="mb-0 mt-2">Join the future of image security</p>
+            </div>
+            <div class="card-body p-5">
+                <form method="POST" id="registrationForm">
+                    <div class="mb-4">
+                        <label for="email" class="form-label">
+                            <i class="fas fa-envelope me-2"></i>Email Address
+                        </label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                        <div class="form-text">We'll use this for account recovery and notifications</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock me-2"></i>Password
+                        </label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">Minimum 8 characters with letters and numbers</div>
+                        <div class="progress mt-2" style="height: 5px;">
+                            <div class="progress-bar" id="passwordStrength" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="confirm_password" class="form-label">
+                            <i class="fas fa-lock me-2"></i>Confirm Password
+                        </label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <div class="invalid-feedback" id="passwordMismatch">
+                            Passwords do not match
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="terms" required>
+                            <label class="form-check-label" for="terms">
+                                I agree to the <a href="#" class="text-primary">Terms of Service</a> and 
+                                <a href="#" class="text-primary">Privacy Policy</a>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="biometric_consent" required>
+                            <label class="form-check-label" for="biometric_consent">
+                                I consent to biometric data collection for authentication purposes
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 btn-lg">
+                        <i class="fas fa-arrow-right me-2"></i>Continue to Face Capture
+                    </button>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-0">Already have an account?</p>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Security Information Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title">
+                    <i class="fas fa-shield-alt text-success me-2"></i>
+                    Your Security is Our Priority
+                </h6>
+                <ul class="list-unstyled mb-0">
+                    <li><i class="fas fa-check text-success me-2"></i>Facial data encrypted and stored securely</li>
+                    <li><i class="fas fa-check text-success me-2"></i>No biometric data leaves your device during capture</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Zero-knowledge encryption keys</li>
+                    <li><i class="fas fa-check text-success me-2"></i>GDPR and CCPA compliant</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const passwordStrength = document.getElementById('passwordStrength');
+    const passwordMismatch = document.getElementById('passwordMismatch');
+    const form = document.getElementById('registrationForm');
+    
+    // Password strength checker
+    passwordInput.addEventListener('input', function() {
+        const password = this.value;
+        let strength = 0;
+        
+        // Check length
+        if (password.length >= 8) strength += 25;
+        if (password.length >= 12) strength += 25;
+        
+        // Check for lowercase
+        if (/[a-z]/.test(password)) strength += 12.5;
+        
+        // Check for uppercase
+        if (/[A-Z]/.test(password)) strength += 12.5;
+        
+        // Check for numbers
+        if (/\d/.test(password)) strength += 12.5;
+        
+        // Check for special characters
+        if (/[^a-zA-Z\d]/.test(password)) strength += 12.5;
+        
+        passwordStrength.style.width = strength + '%';
+        
+        if (strength < 50) {
+            passwordStrength.className = 'progress-bar bg-danger';
+        } else if (strength < 75) {
+            passwordStrength.className = 'progress-bar bg-warning';
+        } else {
+            passwordStrength.className = 'progress-bar bg-success';
+        }
+    });
+    
+    // Password confirmation checker
+    function checkPasswordMatch() {
+        if (confirmPasswordInput.value && passwordInput.value !== confirmPasswordInput.value) {
+            confirmPasswordInput.classList.add('is-invalid');
+            passwordMismatch.style.display = 'block';
+            return false;
+        } else {
+            confirmPasswordInput.classList.remove('is-invalid');
+            passwordMismatch.style.display = 'none';
+            return true;
+        }
+    }
+    
+    confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+    passwordInput.addEventListener('input', checkPasswordMatch);
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        if (!checkPasswordMatch()) {
+            e.preventDefault();
+            return false;
+        }
+        
+        if (passwordInput.value.length < 8) {
+            e.preventDefault();
+            alert('Password must be at least 8 characters long');
+            return false;
+        }
+        
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        submitBtn.disabled = true;
+    });
+    
+    // Email validation
+    const emailInput = document.getElementById('email');
+    emailInput.addEventListener('blur', function() {
+        const email = this.value;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (email && !emailRegex.test(email)) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+});
+</script>
+{% endblock %}

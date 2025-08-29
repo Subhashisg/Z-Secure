@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}Face Management - EncryptPro v2{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-user-cog me-2"></i>Face Management
+                </h3>
+                <p class="mb-0 mt-2">Manage your facial biometric data and encryption keys</p>
+            </div>
+            <div class="card-body p-5">
+                <!-- Current Status -->
+                <div class="row mb-5">
+                    <div class="col-lg-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-info-circle text-info me-2"></i>
+                                    Current Biometric Status
+                                </h6>
+                                {% if face_data %}
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Registration Date:</strong> {{ face_data.created_at }}</li>
+                                    <li><strong>Last Updated:</strong> {{ face_data.updated_at }}</li>
+                                    <li><strong>Status:</strong> <span class="badge bg-success">Active</span></li>
+                                    <li><strong>Key Status:</strong> <span class="badge bg-primary">Generated</span></li>
+                                </ul>
+                                {% else %}
+                                <p class="text-danger mb-0">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    No biometric data found
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Important Notice
+                                </h6>
+                                <p class="mb-0 small">
+                                    Updating your facial data will regenerate your encryption key. 
+                                    Previously encrypted images may become inaccessible unless 
+                                    you have the old key backed up.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Update Face Data -->
+                <div class="mb-5">
+                    <h5>
+                        <i class="fas fa-sync-alt me-2"></i>Update Facial Data
+                    </h5>
+                    <p class="text-muted">
+                        Capture new facial biometric data to update your authentication profile.
+                    </p>
+                    
+                    <div class="face-capture-area mb-4" id="updateCaptureArea">
+                        <video id="updateVideo" autoplay muted style="display: none; width: 100%; max-width: 400px; border-radius: 10px;"></video>
+                        <canvas id="updateCanvas" style="display: none;"></canvas>
+                        
+                        <div id="updateInstructions" class="text-center">
+                            <i class="fas fa-camera" style="font-size: 4rem; color: var(--info-color); margin-bottom: 20px;"></i>
+                            <h6>Update Your Facial Data</h6>
+                            <p class="text-muted">
+                                Position your face in the camera to capture updated biometric data.
+                            </p>
+                            <button type="button" class="btn btn-info" id="startUpdateBtn">
+                                <i class="fas fa-camera me-2"></i>Start Camera
+                            </button>
+                        </div>
+                        
+                        <div id="updateProcessing" style="display: none;" class="text-center">
+                            <div class="spinner-border text-info mb-3" role="status"></div>
+                            <h6>Processing Update...</h6>
+                            <p class="text-muted">Updating biometric data and regenerating keys</p>
+                        </div>
+                        
+                        <div id="updateComplete" style="display: none;" class="text-center">
+                            <i class="fas fa-check-circle text-success" style="font-size: 4rem; margin-bottom: 20px;"></i>
+                            <h6 class="text-success">Update Successful!</h6>
+                            <p class="text-muted">Your facial data and encryption keys have been updated.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="button" class="btn btn-success" id="captureUpdateBtn" style="display: none;">
+                            <i class="fas fa-camera me-2"></i>Capture New Data
+                        </button>
+                        <button type="button" class="btn btn-secondary me-2" id="retakeUpdateBtn" style="display: none;">
+                            <i class="fas fa-redo me-2"></i>Retake
+                        </button>
+                        <button type="button" class="btn btn-primary" id="confirmUpdateBtn" style="display: none;">
+                            <i class="fas fa-check me-2"></i>Confirm Update
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Security Settings -->
+                <div class="mb-5">
+                    <h5>
+                        <i class="fas fa-shield-alt me-2"></i>Security Settings
+                    </h5>
+                    
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-key text-primary mb-3" style="font-size: 2rem;"></i>
+                                    <h6>Regenerate Keys</h6>
+                                    <p class="small text-muted">
+                                        Generate new encryption keys without changing facial data
+                                    </p>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="regenerateKeys()">
+                                        Regenerate
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="card border-danger">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-trash text-danger mb-3" style="font-size: 2rem;"></i>
+                                    <h6>Delete Biometric Data</h6>
+                                    <p class="small text-muted">
+                                        Permanently remove all facial authentication data
+                                    </p>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteBiometricData()">
+                                        Delete Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Backup Information -->
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-download text-success me-2"></i>
+                            Backup & Recovery
+                        </h6>
+                        <p class="mb-3">
+                            For enterprise security, consider backing up your encryption keys 
+                            before making changes to your biometric data.
+                        </p>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-success" onclick="backupKeys()">
+                                <i class="fas fa-download me-1"></i>Backup Keys
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="showRecoveryInfo()">
+                                <i class="fas fa-info-circle me-1"></i>Recovery Info
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form for face update -->
+<form id="updateFaceForm" method="POST" action="{{ url_for('update_face') }}" style="display: none;">
+    <input type="hidden" name="face_data" id="updateFaceDataInput">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const updateVideo = document.getElementById('updateVideo');
+    const updateCanvas = document.getElementById('updateCanvas');
+    const ctx = updateCanvas.getContext('2d');
+    const startUpdateBtn = document.getElementById('startUpdateBtn');
+    const captureUpdateBtn = document.getElementById('captureUpdateBtn');
+    const retakeUpdateBtn = document.getElementById('retakeUpdateBtn');
+    const confirmUpdateBtn = document.getElementById('confirmUpdateBtn');
+    const updateInstructions = document.getElementById('updateInstructions');
+    const updateProcessing = document.getElementById('updateProcessing');
+    const updateComplete = document.getElementById('updateComplete');
+    const updateFaceForm = document.getElementById('updateFaceForm');
+    const updateFaceDataInput = document.getElementById('updateFaceDataInput');
+    
+    let updateStream = null;
+    let capturedUpdateData = null;
+    
+    // Start camera for update
+    startUpdateBtn.addEventListener('click', async function() {
+        try {
+            updateStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 640 }, 
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                } 
+            });
+            
+            updateVideo.srcObject = updateStream;
+            updateVideo.style.display = 'block';
+            updateInstructions.style.display = 'none';
+            captureUpdateBtn.style.display = 'inline-block';
+            
+            updateCanvas.width = 640;
+            updateCanvas.height = 480;
+            
+        } catch (err) {
+            alert('Camera access denied. Please allow camera permission and try again.');
+            console.error('Camera error:', err);
+        }
+    });
+    
+    // Capture update
+    captureUpdateBtn.addEventListener('click', function() {
+        ctx.drawImage(updateVideo, 0, 0, updateCanvas.width, updateCanvas.height);
+        capturedUpdateData = updateCanvas.toDataURL('image/jpeg', 0.8);
+        
+        if (updateStream) {
+            updateStream.getTracks().forEach(track => track.stop());
+        }
+        
+        updateVideo.style.display = 'none';
+        captureUpdateBtn.style.display = 'none';
+        updateCanvas.style.display = 'block';
+        retakeUpdateBtn.style.display = 'inline-block';
+        confirmUpdateBtn.style.display = 'inline-block';
+    });
+    
+    // Retake update
+    retakeUpdateBtn.addEventListener('click', function() {
+        capturedUpdateData = null;
+        updateCanvas.style.display = 'none';
+        updateInstructions.style.display = 'block';
+        retakeUpdateBtn.style.display = 'none';
+        confirmUpdateBtn.style.display = 'none';
+    });
+    
+    // Confirm update
+    confirmUpdateBtn.addEventListener('click', function() {
+        if (!capturedUpdateData) {
+            alert('Please capture your face first.');
+            return;
+        }
+        
+        if (!confirm('Are you sure you want to update your facial data? This will regenerate your encryption keys.')) {
+            return;
+        }
+        
+        // Show processing
+        updateCanvas.style.display = 'none';
+        retakeUpdateBtn.style.display = 'none';
+        confirmUpdateBtn.style.display = 'none';
+        updateProcessing.style.display = 'block';
+        
+        // Submit update
+        updateFaceDataInput.value = capturedUpdateData;
+        
+        const formData = new FormData(updateFaceForm);
+        
+        fetch(updateFaceForm.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateProcessing.style.display = 'none';
+            
+            if (data.success) {
+                updateComplete.style.display = 'block';
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            } else {
+                alert('Update failed: ' + data.message);
+                updateInstructions.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Update failed. Please try again.');
+            updateProcessing.style.display = 'none';
+            updateInstructions.style.display = 'block';
+        });
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (updateStream) {
+            updateStream.getTracks().forEach(track => track.stop());
+        }
+    });
+});
+
+function regenerateKeys() {
+    if (!confirm('Are you sure you want to regenerate your encryption keys? This action cannot be undone.')) {
+        return;
+    }
+    
+    // Implementation for key regeneration
+    alert('Key regeneration feature will be implemented in the next update.');
+}
+
+function deleteBiometricData() {
+    if (!confirm('Are you sure you want to delete all your biometric data? This action cannot be undone and you will lose access to all encrypted images.')) {
+        return;
+    }
+    
+    if (!confirm('This is your final warning. Deleting biometric data will make all your encrypted images inaccessible. Continue?')) {
+        return;
+    }
+    
+    // Implementation for data deletion
+    alert('Biometric data deletion feature will be implemented in the next update.');
+}
+
+function backupKeys() {
+    // Implementation for key backup
+    alert('Key backup feature will be implemented in the next update.');
+}
+
+function showRecoveryInfo() {
+    alert('Recovery information:\n\n' +
+          '1. Keep a secure backup of your encryption keys\n' +
+          '2. Use a password manager for account credentials\n' +
+          '3. Enable two-factor authentication when available\n' +
+          '4. Contact support for enterprise recovery options');
+}
+</script>
+{% endblock %}

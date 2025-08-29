@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - EncryptPro v2{% endblock %}
+
+{% block content %}
+<!-- Welcome Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));">
+            <div class="card-body text-white p-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h2 class="mb-2">
+                            <i class="fas fa-tachometer-alt me-2"></i>
+                            Welcome back, {{ user.email.split('@')[0].title() }}!
+                        </h2>
+                        <p class="mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            Your secure image encryption platform is ready. 
+                            Last login: {{ user.last_login or 'First time' }}
+                        </p>
+                    </div>
+                    <div class="col-lg-4 text-end">
+                        <i class="fas fa-user-shield" style="font-size: 4rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon text-primary mb-3">
+                    <i class="fas fa-upload"></i>
+                </div>
+                <h5 class="card-title">Process Image</h5>
+                <p class="card-text text-muted">
+                    Upload an image to encrypt or decrypt using your Z-secure key
+                </p>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>Upload Image
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon text-success mb-3">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <h5 class="card-title">Manage Biometrics</h5>
+                <p class="card-text text-muted">
+                    Update your facial data and regenerate encryption keys
+                </p>
+                <a href="{{ url_for('manage_face') }}" class="btn btn-success">
+                    <i class="fas fa-face-smile me-2"></i>Face Settings
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon text-info mb-3">
+                    <i class="fas fa-history"></i>
+                </div>
+                <h5 class="card-title">Activity History</h5>
+                <p class="card-text text-muted">
+                    View your encryption/decryption operations log
+                </p>
+                <a href="{{ url_for('history') }}" class="btn btn-info">
+                    <i class="fas fa-list me-2"></i>View History
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>Recent Activity
+                </h5>
+                <a href="{{ url_for('history') }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                <div id="recentActivity">
+                    <div class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin text-muted"></i>
+                        <p class="text-muted mt-2">Loading recent activity...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>Upload Image for Processing
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="imageFile" class="form-label">Select Image File</label>
+                        <input type="file" class="form-control" id="imageFile" name="image" accept="image/*" required>
+                        <div class="form-text">
+                            Supported formats: PNG, JPG, JPEG, GIF, BMP, TIFF, WEBP (Max: 16MB)
+                        </div>
+                    </div>
+                    
+                    <div id="imagePreview" class="mb-4" style="display: none;">
+                        <h6>Preview:</h6>
+                        <div class="border rounded p-3 text-center">
+                            <img id="previewImage" src="" alt="Preview" style="max-width: 100%; max-height: 300px;">
+                            <div id="imageInfo" class="mt-2 text-muted"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="processingInfo" class="alert alert-info" style="display: none;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        The system will automatically detect if your image is encrypted or normal and process accordingly.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="processBtn" disabled>
+                    <i class="fas fa-cogs me-2"></i>Process Image
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div class="modal fade" id="processingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h5>Processing Image...</h5>
+                <p class="text-muted mb-0" id="processingStatus">Analyzing image format...</p>
+                <div class="progress mt-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%" id="processingProgress"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-labelledby="resultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultModalLabel">
+                    <i class="fas fa-check-circle text-success me-2"></i>Processing Complete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="resultContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" class="btn btn-success" id="downloadBtn">
+                    <i class="fas fa-download me-2"></i>Download Result
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadForm = document.getElementById('uploadForm');
+    const imageFile = document.getElementById('imageFile');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImage = document.getElementById('previewImage');
+    const imageInfo = document.getElementById('imageInfo');
+    const processBtn = document.getElementById('processBtn');
+    const processingModal = new bootstrap.Modal(document.getElementById('processingModal'));
+    const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+    const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
+    
+    // Handle file selection
+    imageFile.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size
+            if (file.size > 16 * 1024 * 1024) {
+                alert('File size must be less than 16MB');
+                this.value = '';
+                return;
+            }
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                imagePreview.style.display = 'block';
+                
+                // Show file info
+                imageInfo.innerHTML = `
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                    <strong>Type:</strong> ${file.type}
+                `;
+                
+                processBtn.disabled = false;
+                document.getElementById('processingInfo').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            imagePreview.style.display = 'none';
+            processBtn.disabled = true;
+            document.getElementById('processingInfo').style.display = 'none';
+        }
+    });
+    
+    // Handle image processing
+    processBtn.addEventListener('click', function() {
+        const file = imageFile.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        // Hide upload modal and show processing modal
+        uploadModal.hide();
+        processingModal.show();
+        
+        // Simulate processing steps
+        updateProcessingStatus('Analyzing image format...', 20);
+        
+        setTimeout(() => {
+            updateProcessingStatus('Detecting encryption status...', 40);
+        }, 1000);
+        
+        setTimeout(() => {
+            updateProcessingStatus('Applying Z-secure algorithm...', 70);
+        }, 2000);
+        
+        setTimeout(() => {
+            updateProcessingStatus('Finalizing...', 90);
+        }, 3000);
+        
+        // Submit to server
+        fetch('{{ url_for("process_image") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            processingModal.hide();
+            
+            if (data.success) {
+                showResult(data);
+                loadRecentActivity(); // Refresh activity
+            } else {
+                alert('Processing failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            processingModal.hide();
+            console.error('Error:', error);
+            alert('Processing failed. Please try again.');
+        });
+    });
+    
+    function updateProcessingStatus(status, progress) {
+        document.getElementById('processingStatus').textContent = status;
+        document.getElementById('processingProgress').style.width = progress + '%';
+    }
+    
+    function showResult(data) {
+        const operation = data.operation;
+        const operationText = operation === 'encryption' ? 'Encrypted' : 'Decrypted';
+        const operationIcon = operation === 'encryption' ? 'fa-lock' : 'fa-unlock';
+        const operationColor = operation === 'encryption' ? 'danger' : 'success';
+        
+        document.getElementById('resultContent').innerHTML = `
+            <div class="text-center mb-4">
+                <i class="fas ${operationIcon} text-${operationColor}" style="font-size: 4rem;"></i>
+                <h4 class="mt-3">Image ${operationText} Successfully!</h4>
+                <p class="text-muted">Your image has been processed using Z-secure algorithm.</p>
+            </div>
+            <div class="alert alert-${operationColor}">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Operation:</strong> ${operationText}<br>
+                <strong>Algorithm:</strong> Z-Secure v2 with biometric key derivation<br>
+                <strong>Security Level:</strong> Enterprise Grade (256-bit AES + Chaos)
+            </div>
+        `;
+        
+        document.getElementById('downloadBtn').href = data.download_url;
+        resultModal.show();
+    }
+    
+    // Load recent activity
+    function loadRecentActivity() {
+        fetch('{{ url_for("history") }}?ajax=1&limit=5')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('recentActivity');
+                
+                // Handle new response format
+                const operations = data.success ? data.operations : [];
+                
+                if (operations.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="fas fa-history text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">No recent activity</p>
+                            <small class="text-muted">Upload an image to get started</small>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '<div class="list-group list-group-flush">';
+                operations.forEach(item => {
+                    const icon = item.operation_type === 'encryption' ? 'fa-lock text-danger' : 'fa-unlock text-success';
+                    const badge = item.operation_type === 'encryption' ? 'encrypted' : 'decrypted';
+                    
+                    html += `
+                        <div class="list-group-item border-0 px-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas ${icon} me-3"></i>
+                                    <div>
+                                        <h6 class="mb-1">${item.filename}</h6>
+                                        <small class="text-muted">${new Date(item.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                                <span class="encryption-indicator ${badge}">${item.operation_type}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading activity:', error);
+                document.getElementById('recentActivity').innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                        <p class="text-muted mt-2">Failed to load recent activity</p>
+                    </div>
+                `;
+            });
+    }
+    
+    // Load recent activity on page load
+    loadRecentActivity();
+    
+    // Reset upload form when modal is hidden
+    document.getElementById('uploadModal').addEventListener('hidden.bs.modal', function() {
+        uploadForm.reset();
+        imagePreview.style.display = 'none';
+        processBtn.disabled = true;
+        document.getElementById('processingInfo').style.display = 'none';
+    });
+});
+</script>
+{% endblock %}
