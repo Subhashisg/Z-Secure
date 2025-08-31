@@ -73,10 +73,39 @@ except ImportError:
                     f.write('registered')
                 return True
 
-from zsecure_encryption import ZSecureEncryption
-from image_processor import ImageProcessor
-from database_manager import DatabaseManager
-from src.session_manager import SessionManager
+try:
+    from zsecure_encryption import ZSecureEncryption
+    zsecure = ZSecureEncryption()
+except ImportError as e:
+    print(f"Warning: Could not import ZSecureEncryption: {e}")
+    # Create a minimal fallback
+    class ZSecureEncryption:
+        def generate_key_from_biometrics(self, encoding, email):
+            return b"mock_key_for_testing"
+        def store_zsecure_key(self, user_id, key):
+            return True
+    zsecure = ZSecureEncryption()
+
+try:
+    from image_processor import ImageProcessor
+    image_processor = ImageProcessor()
+except ImportError as e:
+    print(f"Warning: Could not import ImageProcessor: {e}")
+    image_processor = None
+
+try:
+    from database_manager import DatabaseManager
+    db_manager = DatabaseManager()
+except ImportError as e:
+    print(f"Error: Could not import DatabaseManager: {e}")
+    raise
+
+try:
+    from src.session_manager import SessionManager
+    session_manager = SessionManager()
+except ImportError as e:
+    print(f"Warning: Could not import SessionManager: {e}")
+    session_manager = None
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)  # Secure random secret key
@@ -86,14 +115,18 @@ app.config['SESSION_TIMEOUT'] = 900  # 15 minutes session timeout
 
 # Initialize services
 face_service = FaceRecognitionService()
-zsecure = ZSecureEncryption()
-image_processor = ImageProcessor()
-db_manager = DatabaseManager()
-session_manager = SessionManager()
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs('face_data', exist_ok=True)
+os.makedirs('processed', exist_ok=True)
+
+# Initialize database on app startup
+try:
+    db_manager.init_database()
+    print("Database initialized successfully")
+except Exception as e:
+    print(f"Warning: Database initialization failed: {e}")
 
 def login_required(f):
     """Decorator to require login for protected routes"""
@@ -122,6 +155,43 @@ def index():
         if is_valid:
             return redirect(url_for('dashboard'))
     return render_template('index.html')
+
+@app.route('/register_simple', methods=['POST'])
+def register_simple():
+    """Simple registration without face capture for testing"""
+    try:
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        print(f"Simple registration attempt for email: {email}")
+        
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password required'})
+        
+        # Check if user already exists
+        if db_manager.user_exists(email):
+            return jsonify({'success': False, 'message': 'User already exists'})
+        
+        # Create user without face encoding
+        user_id = db_manager.create_user(email, password)
+        print(f"Simple user creation result: user_id = {user_id}")
+        
+        if user_id:
+            print(f"Simple user created successfully with ID: {user_id}")
+            return jsonify({
+                'success': True, 
+                'message': 'Account created successfully',
+                'redirect': url_for('login')
+            })
+        else:
+            print("Failed to create simple user in database")
+            return jsonify({'success': False, 'message': 'Failed to create account'})
+            
+    except Exception as e:
+        print(f"Error in register_simple: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Registration error: {str(e)}'})
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -184,15 +254,27 @@ def capture_face():
         print(f"Registration liveness score: {liveness_result.get('liveness_score', 0)}")
         
         # Create user account
+        print(f"Attempting to create user with email: {email}")
         user_id = db_manager.create_user(email, password, face_encoding)
+        print(f"User creation result: user_id = {user_id}")
+        
         if user_id:
+            print(f"User created successfully with ID: {user_id}")
             # Save face encoding to both database and file for redundancy
-            face_service.save_face_encoding(user_id, face_encoding)
+            try:
+                face_service.save_face_encoding(user_id, face_encoding)
+                print("Face encoding saved successfully")
+            except Exception as e:
+                print(f"Warning: Could not save face encoding: {e}")
             
             # Generate Z-secure key from facial biometrics
             try:
                 zsecure_key = zsecure.generate_key_from_biometrics(face_encoding, email)
-                db_manager.store_zsecure_key(user_id, zsecure_key)
+                if hasattr(db_manager, 'store_zsecure_key'):
+                    db_manager.store_zsecure_key(user_id, zsecure_key)
+                    print("Biometric key generated and stored successfully")
+                else:
+                    print("Warning: store_zsecure_key method not available")
             except Exception as e:
                 print(f"Warning: Could not generate biometric key: {e}")
                 # Continue without biometric key
@@ -204,7 +286,14 @@ def capture_face():
                 'liveness_score': liveness_result.get('liveness_score', 0)
             })
         else:
-            return jsonify({'success': False, 'message': 'Failed to create account'})
+            print("Failed to create user in database")
+            return jsonify({'success': False, 'message': 'Failed to create account. Please try again.'})
+            
+    except Exception as e:
+        print(f"Error in capture_face: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Registration error: {str(e)}'})
             
     except Exception as e:
         print(f"Registration error: {e}")
