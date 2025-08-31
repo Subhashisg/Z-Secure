@@ -2,6 +2,35 @@
 
 {% block title %}Dashboard - EncryptPro v2{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Ensure modal backdrops are handled properly */
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+    
+    .modal {
+        z-index: 1050 !important;
+    }
+    
+    /* Prevent body scrolling issues */
+    body.modal-open {
+        overflow: hidden !important;
+    }
+    
+    /* Processing modal specific styles */
+    #processingModal .modal-content {
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    /* Ensure progress bar animations */
+    .progress-bar-animated {
+        animation: progress-bar-stripes 1s linear infinite;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Welcome Section -->
 <div class="row mb-4">
@@ -204,6 +233,40 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
     const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
     
+    // Utility function to forcefully hide processing modal
+    function forceHideProcessingModal() {
+        try {
+            processingModal.hide();
+            // Also manually hide the modal backdrop if it exists
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+            // Remove modal-open class from body
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        } catch(e) {
+            console.error('Error hiding modal:', e);
+        }
+    }
+    
+    // Add event listeners to ensure modals hide properly
+    document.getElementById('processingModal').addEventListener('hidden.bs.modal', function() {
+        // Reset progress when modal is hidden
+        updateProcessingStatus('Initializing...', 0);
+    });
+    
+    // Add global error handler for modal issues
+    window.addEventListener('error', function() {
+        // Hide processing modal on any error
+        try {
+            forceHideProcessingModal();
+        } catch(e) {
+            // Ignore errors when hiding modal
+        }
+    });
+    
     // Handle file selection
     imageFile.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -251,39 +314,35 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadModal.hide();
         processingModal.show();
         
-        // Simulate processing steps
-        updateProcessingStatus('Analyzing image format...', 20);
+        // Reset progress
+        updateProcessingStatus('Analyzing image format...', 10);
         
-        setTimeout(() => {
-            updateProcessingStatus('Detecting encryption status...', 40);
-        }, 1000);
-        
-        setTimeout(() => {
-            updateProcessingStatus('Applying Z-secure algorithm...', 70);
-        }, 2000);
-        
-        setTimeout(() => {
-            updateProcessingStatus('Finalizing...', 90);
-        }, 3000);
-        
-        // Submit to server
+        // Submit to server immediately (no artificial delays)
         fetch('{{ url_for("process_image") }}', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            updateProcessingStatus('Processing with Z-secure algorithm...', 50);
+            return response.json();
+        })
         .then(data => {
-            processingModal.hide();
+            updateProcessingStatus('Finalizing...', 90);
             
-            if (data.success) {
-                showResult(data);
-                loadRecentActivity(); // Refresh activity
-            } else {
-                alert('Processing failed: ' + data.message);
-            }
+            // Small delay to show completion, then hide modal
+            setTimeout(() => {
+                forceHideProcessingModal();
+                
+                if (data.success) {
+                    showResult(data);
+                    loadRecentActivity(); // Refresh activity
+                } else {
+                    alert('Processing failed: ' + data.message);
+                }
+            }, 500);
         })
         .catch(error => {
-            processingModal.hide();
+            forceHideProcessingModal();
             console.error('Error:', error);
             alert('Processing failed. Please try again.');
         });
@@ -293,8 +352,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('processingStatus').textContent = status;
         document.getElementById('processingProgress').style.width = progress + '%';
     }
-    
+
     function showResult(data) {
+        // Ensure processing modal is completely hidden first
+        forceHideProcessingModal();
+        
         const operation = data.operation;
         const operationText = operation === 'encryption' ? 'Encrypted' : 'Decrypted';
         const operationIcon = operation === 'encryption' ? 'fa-lock' : 'fa-unlock';
@@ -315,10 +377,12 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         document.getElementById('downloadBtn').href = data.download_url;
-        resultModal.show();
-    }
-    
-    // Load recent activity
+        
+        // Small delay to ensure processing modal is completely hidden
+        setTimeout(() => {
+            resultModal.show();
+        }, 100);
+    }    // Load recent activity
     function loadRecentActivity() {
         fetch('{{ url_for("history") }}?ajax=1&limit=5')
             .then(response => response.json())

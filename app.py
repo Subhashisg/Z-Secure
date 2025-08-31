@@ -182,6 +182,10 @@ def authenticate_face():
             app.permanent_session_lifetime = timedelta(minutes=15)
             
             print(f"Authentication successful for user {user_id}")
+            # Update facial data with the latest face encoding
+            new_face_encoding = face_service.process_face_data(face_data)
+            if new_face_encoding is not None:
+                db_manager.update_face_data(user_id, new_face_encoding)
             return jsonify({'success': True, 'redirect': url_for('dashboard')})
         else:
             print(f"Authentication failed for user {user_id}")
