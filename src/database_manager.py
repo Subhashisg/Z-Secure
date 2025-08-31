@@ -110,7 +110,7 @@ class DatabaseManager:
         conn.commit()
         conn.close()
     
-    def create_user(self, email, password, face_encoding):
+    def create_user(self, email, password, face_encoding=None):
         """Create a new user account"""
         try:
             conn = self.get_connection()
@@ -127,12 +127,13 @@ class DatabaseManager:
             
             user_id = cursor.lastrowid
             
-            # Store face encoding
-            face_blob = pickle.dumps(face_encoding)
-            cursor.execute('''
-                INSERT INTO face_data (user_id, face_encoding)
-                VALUES (?, ?)
-            ''', (user_id, face_blob))
+            # Store face encoding if provided
+            if face_encoding is not None:
+                face_blob = pickle.dumps(face_encoding)
+                cursor.execute('''
+                    INSERT INTO face_data (user_id, face_encoding)
+                    VALUES (?, ?)
+                ''', (user_id, face_blob))
             
             conn.commit()
             conn.close()
