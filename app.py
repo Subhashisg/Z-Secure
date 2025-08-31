@@ -231,11 +231,20 @@ def capture_face():
         password = request.form.get('password')
         face_data = request.form.get('face_data')  # Base64 encoded image
         
+        print(f"Capture face request - Email: {email}")
+        print(f"Face data length: {len(face_data) if face_data else 'None'}")
+        print(f"Face data starts with: {face_data[:50] if face_data else 'None'}")
+        
         if not face_data:
             return jsonify({'success': False, 'message': 'No facial data received'})
         
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password are required'})
+        
         # Process facial data with liveness detection
+        print("Starting face data processing...")
         processing_result = face_service.process_face_data_with_liveness(face_data, require_liveness=True)
+        print(f"Processing result: {processing_result}")
         
         if not processing_result['success']:
             error_message = processing_result['error']
@@ -262,10 +271,15 @@ def capture_face():
             print(f"User created successfully with ID: {user_id}")
             # Save face encoding to both database and file for redundancy
             try:
-                face_service.save_face_encoding(user_id, face_encoding)
-                print("Face encoding saved successfully")
+                if isinstance(user_id, (int, str)) and user_id is not None:
+                    face_service.save_face_encoding(user_id, face_encoding)
+                    print("Face encoding saved successfully")
+                else:
+                    print(f"Warning: Invalid user_id for face encoding: {user_id} (type: {type(user_id)})")
             except Exception as e:
                 print(f"Warning: Could not save face encoding: {e}")
+                import traceback
+                traceback.print_exc()
             
             # Generate Z-secure key from facial biometrics
             try:

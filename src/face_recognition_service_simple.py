@@ -73,10 +73,28 @@ class FaceRecognitionService:
         try:
             print("Processing face data (simplified)...")
             
+            if not face_data_b64:
+                return {
+                    'success': False,
+                    'message': 'No face data provided'
+                }
+            
             # Decode base64 image
-            image_data = base64.b64decode(face_data_b64.split(',')[1])
-            image = Image.open(io.BytesIO(image_data))
-            image_array = np.array(image)
+            try:
+                if ',' in face_data_b64:
+                    image_data = base64.b64decode(face_data_b64.split(',')[1])
+                else:
+                    image_data = base64.b64decode(face_data_b64)
+                
+                image = Image.open(io.BytesIO(image_data))
+                image_array = np.array(image)
+                print(f"Image decoded successfully: shape {image_array.shape}")
+            except Exception as e:
+                print(f"Error decoding face data: {e}")
+                return {
+                    'success': False,
+                    'message': f'Error decoding image data: {str(e)}'
+                }
             
             # If OpenCV is not available, just check if we have a valid image
             if not CV2_AVAILABLE:
@@ -152,8 +170,17 @@ class FaceRecognitionService:
     def verify_face_with_liveness(self, user_id, face_data_b64, require_liveness=True):
         """Verify face with liveness detection (simplified)"""
         try:
+            if user_id is None:
+                return {
+                    'success': False,
+                    'message': 'Invalid user ID'
+                }
+            
             # Check if user has registered face data
-            face_files = [f for f in os.listdir(self.face_data_dir) if f.startswith(f'user_{user_id}')]
+            try:
+                face_files = [f for f in os.listdir(self.face_data_dir) if f.startswith(f'user_{user_id}')]
+            except OSError:
+                face_files = []
             
             if not face_files:
                 return {
@@ -189,7 +216,17 @@ class FaceRecognitionService:
     def save_face_encoding(self, user_id, encoding):
         """Save face encoding (simplified)"""
         try:
+            if user_id is None:
+                print("Error: user_id is None, cannot save face encoding")
+                return False
+                
+            if not isinstance(user_id, (int, str)):
+                print(f"Error: user_id must be int or str, got {type(user_id)}")
+                return False
+                
             file_path = os.path.join(self.face_data_dir, f"user_{user_id}.pkl")
+            print(f"Saving face encoding to: {file_path}")
+            
             with open(file_path, 'wb') as f:
                 pickle.dump({'user_id': user_id, 'encoding': encoding, 'registered': True}, f)
             return True
