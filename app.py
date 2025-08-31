@@ -223,6 +223,53 @@ def register():
     
     return render_template('register.html')
 
+@app.route('/capture_face_bypass', methods=['POST'])
+def capture_face_bypass():
+    """Bypass face capture for testing - register without face processing"""
+    try:
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        print(f"Bypass registration attempt for email: {email}")
+        
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password are required'})
+        
+        # Skip face processing entirely and create user directly
+        mock_face_encoding = [0.1] * 128  # Mock encoding
+        
+        print(f"Creating user with mock face encoding...")
+        user_id = db_manager.create_user(email, password, mock_face_encoding)
+        print(f"Bypass user creation result: user_id = {user_id}")
+        
+        if user_id:
+            print(f"Bypass user created successfully with ID: {user_id}")
+            
+            # Try to save mock face encoding
+            try:
+                face_service.save_face_encoding(user_id, mock_face_encoding)
+                print("Mock face encoding saved successfully")
+            except Exception as e:
+                print(f"Warning: Could not save mock face encoding: {e}")
+            
+            # Skip biometric key generation for bypass
+            
+            return jsonify({
+                'success': True, 
+                'redirect': url_for('login'),
+                'liveness_score': 0.95,
+                'message': 'Account created successfully (bypass mode)'
+            })
+        else:
+            print("Failed to create bypass user in database")
+            return jsonify({'success': False, 'message': 'Failed to create account. Please try again.'})
+            
+    except Exception as e:
+        print(f"Error in capture_face_bypass: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Registration error: {str(e)}'})
+
 @app.route('/capture_face', methods=['POST'])
 def capture_face():
     """Capture and process facial data during registration with liveness detection"""

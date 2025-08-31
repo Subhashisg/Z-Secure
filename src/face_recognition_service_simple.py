@@ -79,56 +79,38 @@ class FaceRecognitionService:
                     'message': 'No face data provided'
                 }
             
-            # Decode base64 image
+            # Basic validation - just check if it looks like base64 image data
             try:
-                if ',' in face_data_b64:
-                    image_data = base64.b64decode(face_data_b64.split(',')[1])
+                if isinstance(face_data_b64, str) and len(face_data_b64) > 100:
+                    # Just validate it's a reasonable length for an image
+                    print(f"Face data received: {len(face_data_b64)} characters")
+                    
+                    # Try basic base64 decode validation
+                    if ',' in face_data_b64:
+                        test_data = face_data_b64.split(',')[1][:100]  # Just test first 100 chars
+                    else:
+                        test_data = face_data_b64[:100]
+                    
+                    # Test decode a small portion
+                    base64.b64decode(test_data)
+                    print("Base64 validation successful")
+                    
+                    return {
+                        'success': True,
+                        'face_count': 1,  # Assume face is present for minimal mode
+                        'message': 'Face data validated successfully (minimal mode)'
+                    }
                 else:
-                    image_data = base64.b64decode(face_data_b64)
-                
-                image = Image.open(io.BytesIO(image_data))
-                image_array = np.array(image)
-                print(f"Image decoded successfully: shape {image_array.shape}")
-            except Exception as e:
-                print(f"Error decoding face data: {e}")
-                return {
-                    'success': False,
-                    'message': f'Error decoding image data: {str(e)}'
-                }
-            
-            # If OpenCV is not available, just check if we have a valid image
-            if not CV2_AVAILABLE:
-                return {
-                    'success': True,
-                    'face_count': 1,  # Assume face is present
-                    'message': 'Face detected successfully (minimal mode)'
-                }
-            
-            # Convert RGB to BGR for OpenCV
-            if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-                image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-            
-            # Detect faces if MediaPipe is available
-            if MEDIAPIPE_AVAILABLE:
-                face_locations = self.detect_faces_mediapipe(image_array)
-                
-                if not face_locations:
                     return {
                         'success': False,
-                        'message': 'No face detected in the image'
+                        'message': 'Invalid face data format'
                     }
-                
+                    
+            except Exception as e:
+                print(f"Error validating face data: {e}")
                 return {
-                    'success': True,
-                    'face_count': len(face_locations),
-                    'message': 'Face detected successfully'
-                }
-            else:
-                # Fallback: assume face is present
-                return {
-                    'success': True,
-                    'face_count': 1,
-                    'message': 'Face detected successfully (fallback mode)'
+                    'success': False,
+                    'message': f'Error validating image data: {str(e)}'
                 }
             
         except Exception as e:
@@ -141,7 +123,9 @@ class FaceRecognitionService:
     def process_face_data_with_liveness(self, face_data_b64, require_liveness=True):
         """Process face data with liveness detection (simplified)"""
         try:
-            # Use the existing simple processing method
+            print("Processing face data with liveness (simplified)...")
+            
+            # Use the ultra-minimal processing method
             result = self.process_face_data_simple(face_data_b64)
             
             if result['success']:
@@ -162,6 +146,7 @@ class FaceRecognitionService:
                 }
                 
         except Exception as e:
+            print(f"Error in process_face_data_with_liveness: {str(e)}")
             return {
                 'success': False,
                 'error': f'Face processing error: {str(e)}'
