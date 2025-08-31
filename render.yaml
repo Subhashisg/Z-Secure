@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: zsecure-app
+    env: python
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      apt-get update
+      apt-get install -y cmake libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1
+      pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - key: ENVIRONMENT
+        value: production
