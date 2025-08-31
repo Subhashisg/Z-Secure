@@ -40,9 +40,11 @@ except ImportError:
                 print("Using minimal fallback face recognition service")
             
             def process_face_data_with_liveness(self, face_data, require_liveness=True):
+                import numpy as np
+                mock_encoding = np.array([0.1] * 128, dtype=np.float64)
                 return {
                     'success': True, 
-                    'encoding': [0.1] * 128,  # Mock face encoding
+                    'encoding': mock_encoding,  # Use numpy array
                     'liveness_result': {'liveness_score': 0.95, 'is_live': True},
                     'message': 'Face processing completed (minimal mode)'
                 }
@@ -81,7 +83,9 @@ except ImportError as e:
     # Create a minimal fallback
     class ZSecureEncryption:
         def generate_key_from_biometrics(self, encoding, email):
-            return b"mock_key_for_testing"
+            # Create a deterministic key from email for fallback
+            import hashlib
+            return hashlib.sha256(f"{email}_fallback_key".encode()).digest()[:32]
         def store_zsecure_key(self, user_id, key):
             return True
     zsecure = ZSecureEncryption()
@@ -236,7 +240,8 @@ def capture_face_bypass():
             return jsonify({'success': False, 'message': 'Email and password are required'})
         
         # Skip face processing entirely and create user directly
-        mock_face_encoding = [0.1] * 128  # Mock encoding
+        import numpy as np
+        mock_face_encoding = np.array([0.1] * 128, dtype=np.float64)  # Use numpy array
         
         print(f"Creating user with mock face encoding...")
         user_id = db_manager.create_user(email, password, mock_face_encoding)

@@ -129,10 +129,13 @@ class FaceRecognitionService:
             result = self.process_face_data_simple(face_data_b64)
             
             if result['success']:
-                # Return format expected by the app
+                # Return format expected by the app - use numpy array for compatibility
+                import numpy as np
+                mock_encoding = np.array([0.1] * 128, dtype=np.float64)
+                
                 return {
                     'success': True,
-                    'encoding': [0.1] * 128,  # Mock face encoding
+                    'encoding': mock_encoding,  # Use numpy array instead of list
                     'liveness_result': {
                         'liveness_score': 0.95,
                         'is_live': True
