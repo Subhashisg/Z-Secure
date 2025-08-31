@@ -1,17 +1,11 @@
-# Use Python 3.11 for better compatibility
+# Alternative Dockerfile - Ultra-minimal approach
 FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install minimal system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first for better caching
-COPY requirements-docker.txt requirements.txt
+# Copy minimal requirements
+COPY requirements-minimal-docker.txt requirements.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip && \
@@ -23,11 +17,8 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads processed face_data
 
-# Set environment variable to use simplified app
-ENV FLASK_APP=app_docker.py
-
 # Expose port
 EXPOSE 5000
 
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app_docker:app"]
+# Run the application with basic Flask server
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
