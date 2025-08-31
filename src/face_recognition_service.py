@@ -13,7 +13,8 @@ class FaceRecognitionService:
     
     def __init__(self):
         self.face_data_dir = 'face_data'
-        self.tolerance = 0.6  # Adjusted for better usability while maintaining security
+        self.tolerance = 0.4  # More strict tolerance for better security
+        self.min_face_size = 50  # Minimum face size in pixels
         os.makedirs(self.face_data_dir, exist_ok=True)
     
     def process_face_data(self, face_data_b64):
@@ -70,8 +71,25 @@ class FaceRecognitionService:
                 print("No faces detected in image")
                 return None
             
-            # Get face encodings
-            face_encodings = face_recognition.face_encodings(image_array, face_locations, model='large')
+            # Validate face size and quality
+            for face_location in face_locations:
+                top, right, bottom, left = face_location
+                face_width = right - left
+                face_height = bottom - top
+                
+                # Check minimum face size
+                if face_width < self.min_face_size or face_height < self.min_face_size:
+                    print(f"Face too small: {face_width}x{face_height}, minimum required: {self.min_face_size}x{self.min_face_size}")
+                    return None
+                
+                # Check face aspect ratio (should be roughly square for a frontal face)
+                aspect_ratio = face_width / face_height
+                if aspect_ratio < 0.7 or aspect_ratio > 1.5:
+                    print(f"Invalid face aspect ratio: {aspect_ratio}")
+                    return None
+            
+            # Get face encodings with large model for better accuracy
+            face_encodings = face_recognition.face_encodings(image_array, face_locations, model='large', num_jitters=2)
             
             print(f"Generated {len(face_encodings)} face encoding(s)")
             
@@ -152,9 +170,25 @@ class FaceRecognitionService:
             distance = distances[0] if len(distances) > 0 else 1.0
             print(f"Face distance: {distance} (threshold: {self.tolerance})")
             
-            # Compare faces
+            # Additional security checks
+            # 1. Check if distance is reasonable (not too close, indicating potential spoofing)
+            if distance < 0.1:
+                print("Warning: Distance too close, potential spoofing attempt")
+                return False
+            
+            # 2. Verify encoding quality
+            if not self._is_valid_encoding(stored_encoding) or not self._is_valid_encoding(current_encoding):
+                print("Invalid encoding detected")
+                return False
+            
+            # Compare faces with strict tolerance
             matches = face_recognition.compare_faces([stored_encoding], current_encoding, tolerance=self.tolerance)
             result = matches[0] if matches else False
+            
+            # Additional validation: even if match is True, reject if distance is too high
+            if result and distance > self.tolerance * 0.8:  # 80% of tolerance as additional check
+                print(f"Match rejected due to high distance: {distance}")
+                result = False
             
             print(f"Face verification result: {result}")
             return result
@@ -230,3 +264,31 @@ class FaceRecognitionService:
         except Exception as e:
             print(f"Error enhancing image: {e}")
             return image_array
+    
+    def _is_valid_encoding(self, encoding):
+        """Validate face encoding quality"""
+        try:
+            if encoding is None:
+                return False
+            
+            # Check encoding shape
+            if not hasattr(encoding, 'shape') or encoding.shape != (128,):
+                return False
+            
+            # Check for all zeros or all ones (invalid encodings)
+            if np.all(encoding == 0) or np.all(encoding == 1):
+                return False
+            
+            # Check for reasonable variance (valid face encodings should have some variance)
+            if np.var(encoding) < 0.001:
+                return False
+            
+            # Check for extreme values
+            if np.any(np.abs(encoding) > 5.0):
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error validating encoding: {e}")
+            return False

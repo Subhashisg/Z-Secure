@@ -182,10 +182,6 @@ def authenticate_face():
             app.permanent_session_lifetime = timedelta(minutes=15)
             
             print(f"Authentication successful for user {user_id}")
-            # Update facial data with the latest face encoding
-            new_face_encoding = face_service.process_face_data(face_data)
-            if new_face_encoding is not None:
-                db_manager.update_face_data(user_id, new_face_encoding)
             return jsonify({'success': True, 'redirect': url_for('dashboard')})
         else:
             print(f"Authentication failed for user {user_id}")
@@ -332,6 +328,54 @@ def history():
     
     return render_template('history.html', operations=operations)
 
+@app.route('/delete_account', methods=['POST'])
+@login_required
+def delete_account():
+    """Delete user account permanently"""
+    try:
+        # Get current user info for validation
+        current_user = db_manager.get_user(session['user_id'])
+        if not current_user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        # Verify password for security
+        password = request.form.get('password')
+        if not password:
+            return jsonify({'success': False, 'message': 'Password verification required'})
+        
+        # Re-verify user credentials
+        user_verification = db_manager.verify_user_credentials(current_user['email'], password)
+        if not user_verification:
+            return jsonify({'success': False, 'message': 'Invalid password. Account deletion cancelled.'})
+        
+        user_id = session['user_id']
+        
+        # Clean up user files first
+        db_manager.cleanup_user_files(user_id)
+        
+        # Invalidate all user sessions
+        if 'session_id' in session:
+            session_manager.invalidate_session(session['session_id'])
+        
+        # Delete user account and all associated data
+        deletion_success = db_manager.delete_user_account(user_id)
+        
+        if deletion_success:
+            # Clear session
+            session.clear()
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Account successfully deleted. You will be redirected to the home page.',
+                'redirect': url_for('index')
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to delete account. Please try again.'})
+            
+    except Exception as e:
+        print(f"Error deleting account: {e}")
+        return jsonify({'success': False, 'message': f'Account deletion failed: {str(e)}'})
+
 @app.route('/logout')
 def logout():
     """User logout"""
@@ -358,6 +402,4 @@ if __name__ == '__main__':
     # Create processed directory
     os.makedirs('processed', exist_ok=True)
     
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)

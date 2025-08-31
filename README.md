@@ -1,6 +1,6 @@
 # EncryptPro v2 - Enterprise Image Security Platform
 
-![Z-Secure](https://img.shields.io/badge/EncryptPro-v2.0-blue.svg)
+![EncryptPro v2](https://img.shields.io/badge/EncryptPro-v2.0-blue.svg)
 ![Security](https://img.shields.io/badge/Security-Enterprise%20Grade-green.svg)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
 ![Flask](https://img.shields.io/badge/Flask-2.3%2B-red.svg)

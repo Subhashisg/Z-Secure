@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Face Management - EncryptPro v2{% endblock %}
+{% block title %}Account Settings - EncryptPro v2{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -8,9 +8,9 @@
         <div class="card">
             <div class="card-header bg-info text-white">
                 <h3 class="mb-0">
-                    <i class="fas fa-user-cog me-2"></i>Face Management
+                    <i class="fas fa-user-cog me-2"></i>Account Settings
                 </h3>
-                <p class="mb-0 mt-2">Manage your facial biometric data and encryption keys</p>
+                <p class="mb-0 mt-2">Manage your facial biometric data, encryption keys, and account settings</p>
             </div>
             <div class="card-body p-5">
                 <!-- Current Status -->
@@ -131,13 +131,13 @@
                         <div class="col-lg-6">
                             <div class="card border-danger">
                                 <div class="card-body text-center">
-                                    <i class="fas fa-trash text-danger mb-3" style="font-size: 2rem;"></i>
-                                    <h6>Delete Biometric Data</h6>
+                                    <i class="fas fa-user-times text-danger mb-3" style="font-size: 2rem;"></i>
+                                    <h6>Delete Account</h6>
                                     <p class="small text-muted">
-                                        Permanently remove all facial authentication data
+                                        Permanently delete your account and all associated data
                                     </p>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteBiometricData()">
-                                        Delete Data
+                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAccount()">
+                                        Delete Account
                                     </button>
                                 </div>
                             </div>
@@ -322,6 +322,68 @@ function deleteBiometricData() {
     
     // Implementation for data deletion
     alert('Biometric data deletion feature will be implemented in the next update.');
+}
+
+function deleteAccount() {
+    // First confirmation
+    if (!confirm('⚠️ WARNING: This will permanently delete your entire account!\n\nThis action will:\n• Delete all your biometric data\n• Remove all encryption keys\n• Delete your operation history\n• Make all encrypted images inaccessible forever\n\nThis action CANNOT be undone. Are you absolutely sure?')) {
+        return;
+    }
+    
+    // Second confirmation with more emphasis
+    if (!confirm('🔴 FINAL WARNING 🔴\n\nYou are about to PERMANENTLY DELETE your account.\n\nAll your data will be lost forever!\n\nType "DELETE" in the next prompt to confirm.')) {
+        return;
+    }
+    
+    // Third confirmation - text input
+    const confirmText = prompt('Type "DELETE" (all caps) to confirm account deletion:');
+    if (confirmText !== 'DELETE') {
+        alert('Account deletion cancelled. Text did not match.');
+        return;
+    }
+    
+    // Password verification
+    const password = prompt('Enter your password to verify account deletion:');
+    if (!password) {
+        alert('Password required for account deletion.');
+        return;
+    }
+    
+    // Show processing state
+    const deleteButton = event.target;
+    const originalText = deleteButton.innerHTML;
+    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+    deleteButton.disabled = true;
+    
+    // Send delete request
+    const formData = new FormData();
+    formData.append('password', password);
+    
+    fetch('{{ url_for("delete_account") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Account successfully deleted.\n\nYou will be redirected to the home page.');
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else {
+                window.location.href = '/';
+            }
+        } else {
+            alert('❌ Account deletion failed: ' + data.message);
+            deleteButton.innerHTML = originalText;
+            deleteButton.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Account deletion failed. Please try again.');
+        deleteButton.innerHTML = originalText;
+        deleteButton.disabled = false;
+    });
 }
 
 function backupKeys() {

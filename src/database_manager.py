@@ -463,3 +463,55 @@ class DatabaseManager:
             
         except Exception as e:
             print(f"Error updating last login: {e}")
+    
+    def delete_user_account(self, user_id):
+        """Delete user account and all associated data"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Log the account deletion
+            self.log_security_event(user_id, 'ACCOUNT_DELETED', 'User account permanently deleted', 'WARNING')
+            
+            # Due to CASCADE constraints, deleting the user will automatically delete:
+            # - face_data
+            # - zsecure_keys  
+            # - sessions
+            # - operations_log
+            # Note: security_events are kept for audit purposes
+            
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            
+            # Verify deletion
+            rows_affected = cursor.rowcount
+            
+            conn.commit()
+            conn.close()
+            
+            return rows_affected > 0
+            
+        except Exception as e:
+            print(f"Error deleting user account: {e}")
+            return False
+    
+    def cleanup_user_files(self, user_id):
+        """Clean up user-related files from filesystem"""
+        try:
+            import os
+            import glob
+            
+            # Remove face data file if it exists
+            face_file_path = f"face_data/user_{user_id}.pkl"
+            if os.path.exists(face_file_path):
+                os.remove(face_file_path)
+                print(f"Removed face data file: {face_file_path}")
+            
+            # Clean up any temporary files in uploads directory
+            # (Note: In a production system, you'd want to track user files more precisely)
+            
+            print(f"Completed file cleanup for user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"Error cleaning up user files: {e}")
+            return False
