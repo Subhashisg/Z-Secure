@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Activity History - EncryptPro v2{% endblock %}
+{% block title %}Activity History - Z-Secure{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -488,7 +488,7 @@ function exportHistory() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `encryptpro_history_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `zsecure_history_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

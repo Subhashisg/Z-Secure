@@ -23,7 +23,7 @@ from face_recognition_service import FaceRecognitionService
 from zsecure_encryption import ZSecureEncryption
 from image_processor import ImageProcessor
 from database_manager import DatabaseManager
-from session_manager import SessionManager
+from src.session_manager import SessionManager
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)  # Secure random secret key
@@ -50,7 +50,8 @@ def login_required(f):
             return redirect(url_for('login'))
         
         # Check session timeout
-        if not session_manager.is_session_valid(session.get('session_id')):
+        is_valid, user_id = session_manager.is_session_valid(session.get('session_id'))
+        if not is_valid:
             session.clear()
             flash('Session expired. Please log in again.', 'warning')
             return redirect(url_for('login'))
@@ -63,8 +64,10 @@ def login_required(f):
 @app.route('/')
 def index():
     """Home page"""
-    if 'user_id' in session and session_manager.is_session_valid(session.get('session_id')):
-        return redirect(url_for('dashboard'))
+    if 'user_id' in session:
+        is_valid, user_id = session_manager.is_session_valid(session.get('session_id'))
+        if is_valid:
+            return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -99,7 +102,7 @@ def register():
 
 @app.route('/capture_face', methods=['POST'])
 def capture_face():
-    """Capture and process facial data during registration"""
+    """Capture and process facial data during registration with liveness detection"""
     try:
         email = request.form.get('email')
         password = request.form.get('password')
@@ -108,10 +111,24 @@ def capture_face():
         if not face_data:
             return jsonify({'success': False, 'message': 'No facial data received'})
         
-        # Process facial data
-        face_encoding = face_service.process_face_data(face_data)
-        if face_encoding is None:
-            return jsonify({'success': False, 'message': 'Could not detect face. Please try again.'})
+        # Process facial data with liveness detection
+        processing_result = face_service.process_face_data_with_liveness(face_data, require_liveness=True)
+        
+        if not processing_result['success']:
+            error_message = processing_result['error']
+            
+            # Provide user-friendly error messages
+            if 'liveness' in error_message.lower():
+                error_message = 'Liveness detection failed. Please ensure you are a real person and try again.'
+            elif 'face' in error_message.lower():
+                error_message = 'Could not detect face clearly. Please ensure good lighting and try again.'
+            
+            return jsonify({'success': False, 'message': error_message})
+        
+        face_encoding = processing_result['encoding']
+        liveness_result = processing_result['liveness_result']
+        
+        print(f"Registration liveness score: {liveness_result.get('liveness_score', 0)}")
         
         # Create user account
         user_id = db_manager.create_user(email, password, face_encoding)
@@ -123,12 +140,19 @@ def capture_face():
             zsecure_key = zsecure.generate_key_from_biometrics(face_encoding, email)
             db_manager.store_zsecure_key(user_id, zsecure_key)
             
-            flash('Account created successfully! Please log in.', 'success')
-            return jsonify({'success': True, 'redirect': url_for('login')})
+            flash('Account created successfully with biometric security! Please log in.', 'success')
+            return jsonify({
+                'success': True, 
+                'redirect': url_for('login'),
+                'liveness_score': liveness_result.get('liveness_score', 0)
+            })
         else:
             return jsonify({'success': False, 'message': 'Failed to create account'})
             
     except Exception as e:
+        print(f"Registration error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': f'Registration failed: {str(e)}'})
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -154,7 +178,7 @@ def login():
 
 @app.route('/authenticate_face', methods=['POST'])
 def authenticate_face():
-    """Facial authentication for login"""
+    """Facial authentication for login with liveness detection"""
     try:
         user_id = request.form.get('user_id')
         face_data = request.form.get('face_data')
@@ -169,23 +193,55 @@ def authenticate_face():
         
         print(f"Face data length: {len(face_data)} characters")
         
-        # Verify facial authentication
-        verification_result = face_service.verify_face(user_id, face_data)
+        # Verify facial authentication with liveness detection
+        verification_result = face_service.verify_face_with_liveness(user_id, face_data, require_liveness=True)
         print(f"Face verification result: {verification_result}")
         
-        if verification_result:
-            # Create session
-            session_id = session_manager.create_session(user_id)
-            session['user_id'] = user_id
-            session['session_id'] = session_id
-            session.permanent = True
-            app.permanent_session_lifetime = timedelta(minutes=15)
+        if verification_result['success']:
+            # Create session with IP address and user agent
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
+            user_agent = request.environ.get('HTTP_USER_AGENT')
+            session_id = session_manager.create_session(user_id, ip_address, user_agent)
+            
+            if session_id:
+                session['user_id'] = user_id
+                session['session_id'] = session_id
+                session.permanent = True
+                app.permanent_session_lifetime = timedelta(minutes=15)
+                
+                print(f"Authentication successful for user {user_id}")
+            else:
+                return jsonify({'success': False, 'message': 'Failed to create session. Please try again.'})
             
             print(f"Authentication successful for user {user_id}")
-            return jsonify({'success': True, 'redirect': url_for('dashboard')})
+            
+            # Include liveness score in response for logging
+            liveness_info = verification_result.get('liveness_result', {})
+            liveness_score = liveness_info.get('liveness_score', 0)
+            
+            return jsonify({
+                'success': True, 
+                'redirect': url_for('dashboard'),
+                'liveness_score': liveness_score
+            })
         else:
-            print(f"Authentication failed for user {user_id}")
-            return jsonify({'success': False, 'message': 'Facial authentication failed. Please ensure good lighting and try again.'})
+            error_message = verification_result.get('error', 'Facial authentication failed')
+            liveness_result = verification_result.get('liveness_result', {})
+            
+            # Provide specific error messages based on failure reason
+            if 'liveness' in error_message.lower():
+                error_message = 'Liveness detection failed. Please ensure you are a real person and try again.'
+            elif 'spoofing' in error_message.lower():
+                error_message = 'Security check failed. Please try again with proper lighting.'
+            else:
+                error_message = 'Facial authentication failed. Please ensure good lighting and try again.'
+            
+            print(f"Authentication failed for user {user_id}: {error_message}")
+            return jsonify({
+                'success': False, 
+                'message': error_message,
+                'liveness_info': liveness_result
+            })
             
     except Exception as e:
         print(f"Authentication error: {e}")
@@ -389,7 +445,8 @@ def logout():
 def check_session_timeout():
     """Check session timeout before each request"""
     if 'user_id' in session:
-        if not session_manager.is_session_valid(session.get('session_id')):
+        is_valid, user_id = session_manager.is_session_valid(session.get('session_id'))
+        if not is_valid:
             session.clear()
             if request.endpoint not in ['index', 'login', 'register']:
                 flash('Session expired. Please log in again.', 'warning')

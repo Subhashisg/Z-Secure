@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-EncryptPro v2 - Installation and System Test
+"""
+Z-Secure - Installation and System Test
+Z-Secure - Enterprise Security Platform
+
+This script performs comprehensive system testing to ensure all components
+are properly installed and configured for the Z-Secure platform.
 """
 
 import sys
@@ -117,7 +122,7 @@ def test_files():
 def main():
     """Run all tests"""
     print("=" * 50)
-    print("EncryptPro v2 - System Test")
+    print("Z-Secure - System Test")
     print("=" * 50)
     
     tests = [
@@ -143,11 +148,11 @@ def main():
     
     if passed == total:
         print(f"✓ All tests passed ({passed}/{total})")
-        print("\nEncryptPro v2 is ready to run!")
+        print("\nZ-Secure is ready to run!")
         print("Use 'start.bat' to launch the application.")
     else:
         print(f"✗ {total - passed} test(s) failed ({passed}/{total})")
-        print("\nPlease fix the issues above before running EncryptPro v2.")
+        print("\nPlease fix the issues above before running Z-Secure.")
         
         if not test_dependencies():
             print("\nTo install dependencies:")

@@ -7,15 +7,70 @@ import base64
 import json
 from PIL import Image
 import io
+from liveness_detector import LivenessDetector
 
 class FaceRecognitionService:
-    """Advanced face recognition service for authentication"""
+    """Advanced face recognition service for authentication with liveness detection"""
     
     def __init__(self):
         self.face_data_dir = 'face_data'
         self.tolerance = 0.4  # More strict tolerance for better security
         self.min_face_size = 50  # Minimum face size in pixels
         os.makedirs(self.face_data_dir, exist_ok=True)
+        
+        # Initialize liveness detector
+        self.liveness_detector = LivenessDetector()
+        print("Face Recognition Service initialized with liveness detection")
+    
+    def process_face_data_with_liveness(self, face_data_b64, require_liveness=True):
+        """Process base64 encoded face data with liveness detection"""
+        try:
+            print("Processing face data with liveness detection...")
+            
+            # First, perform liveness detection if required
+            if require_liveness:
+                liveness_result = self.liveness_detector.process_image_for_liveness(face_data_b64)
+                print(f"Liveness detection result: {liveness_result}")
+                
+                if not liveness_result.get('liveness_passed', False):
+                    print("Liveness detection failed")
+                    return {
+                        'success': False,
+                        'error': 'Liveness detection failed',
+                        'liveness_result': liveness_result,
+                        'encoding': None
+                    }
+                
+                print(f"Liveness detection passed with score: {liveness_result.get('liveness_score', 0)}")
+            
+            # Process face encoding using existing method
+            face_encoding = self.process_face_data(face_data_b64)
+            
+            if face_encoding is None:
+                return {
+                    'success': False,
+                    'error': 'Failed to process face data',
+                    'liveness_result': liveness_result if require_liveness else None,
+                    'encoding': None
+                }
+            
+            return {
+                'success': True,
+                'encoding': face_encoding,
+                'liveness_result': liveness_result if require_liveness else None,
+                'error': None
+            }
+            
+        except Exception as e:
+            print(f"Error in face processing with liveness: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': f'Face processing error: {str(e)}',
+                'liveness_result': None,
+                'encoding': None
+            }
     
     def process_face_data(self, face_data_b64):
         """Process base64 encoded face data and extract encoding"""
@@ -132,6 +187,125 @@ class FaceRecognitionService:
             print(f"Error loading face encoding: {e}")
             return None
     
+    def verify_face_with_liveness(self, user_id, face_data_b64, require_liveness=True):
+        """Verify face against stored encoding with liveness detection"""
+        try:
+            print(f"Starting face verification with liveness for user {user_id}")
+            
+            # Process face data with liveness detection
+            processing_result = self.process_face_data_with_liveness(face_data_b64, require_liveness)
+            
+            if not processing_result['success']:
+                print(f"Face processing failed: {processing_result['error']}")
+                return {
+                    'success': False,
+                    'error': processing_result['error'],
+                    'liveness_result': processing_result['liveness_result']
+                }
+            
+            current_encoding = processing_result['encoding']
+            liveness_result = processing_result['liveness_result']
+            
+            # Load stored encoding
+            stored_encoding = None
+            
+            # Try to get from database first
+            try:
+                from database_manager import DatabaseManager
+                db_manager = DatabaseManager()
+                stored_encoding = db_manager.get_face_encoding(user_id)
+                print(f"Loaded face encoding from database: {stored_encoding is not None}")
+            except Exception as db_error:
+                print(f"Database error, trying file fallback: {db_error}")
+                # Fallback to file storage
+                stored_encoding = self.load_face_encoding(user_id)
+                print(f"Loaded face encoding from file: {stored_encoding is not None}")
+            
+            if stored_encoding is None:
+                print("No stored face encoding found")
+                return {
+                    'success': False,
+                    'error': 'No stored face encoding found',
+                    'liveness_result': liveness_result
+                }
+            
+            # Perform face comparison
+            verification_result = self._compare_face_encodings(stored_encoding, current_encoding)
+            
+            result = {
+                'success': verification_result['match'],
+                'distance': verification_result['distance'],
+                'liveness_result': liveness_result,
+                'error': verification_result.get('error')
+            }
+            
+            print(f"Face verification with liveness result: {result}")
+            return result
+            
+        except Exception as e:
+            print(f"Error in face verification with liveness: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': f'Verification error: {str(e)}',
+                'liveness_result': None
+            }
+    
+    def _compare_face_encodings(self, stored_encoding, current_encoding):
+        """Compare two face encodings and return detailed result"""
+        try:
+            print(f"Stored encoding shape: {stored_encoding.shape if hasattr(stored_encoding, 'shape') else 'No shape'}")
+            print(f"Current encoding shape: {current_encoding.shape if hasattr(current_encoding, 'shape') else 'No shape'}")
+            
+            # Compare faces with distance calculation
+            distances = face_recognition.face_distance([stored_encoding], current_encoding)
+            distance = distances[0] if len(distances) > 0 else 1.0
+            print(f"Face distance: {distance} (threshold: {self.tolerance})")
+            
+            # Additional security checks
+            # 1. Check if distance is reasonable (not too close, indicating potential spoofing)
+            if distance < 0.05:
+                print("Warning: Distance too close, potential spoofing attempt")
+                return {
+                    'match': False,
+                    'distance': distance,
+                    'error': 'Distance too close, potential spoofing'
+                }
+            
+            # 2. Verify encoding quality
+            if not self._is_valid_encoding(stored_encoding) or not self._is_valid_encoding(current_encoding):
+                print("Invalid encoding detected")
+                return {
+                    'match': False,
+                    'distance': distance,
+                    'error': 'Invalid encoding detected'
+                }
+            
+            # Compare faces with strict tolerance
+            matches = face_recognition.compare_faces([stored_encoding], current_encoding, tolerance=self.tolerance)
+            match_result = matches[0] if matches else False
+            
+            # Additional validation: even if match is True, reject if distance is too high
+            if match_result and distance > self.tolerance * 0.8:  # 80% of tolerance as additional check
+                print(f"Match rejected due to high distance: {distance}")
+                match_result = False
+            
+            print(f"Face comparison result: {match_result}")
+            return {
+                'match': match_result,
+                'distance': distance,
+                'error': None
+            }
+            
+        except Exception as e:
+            print(f"Error comparing face encodings: {e}")
+            return {
+                'match': False,
+                'distance': 1.0,
+                'error': f'Comparison error: {str(e)}'
+            }
+
     def verify_face(self, user_id, face_data_b64):
         """Verify face against stored encoding"""
         try:

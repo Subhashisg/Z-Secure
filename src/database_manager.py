@@ -7,9 +7,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 class DatabaseManager:
-    """Database management for user data, face data, and operations"""
+    """Database operations for Z-Secure authentication system"""
     
-    def __init__(self, db_path='encryptpro.db'):
+    def __init__(self, db_path='zsecure.db'):
         self.db_path = db_path
         
     def get_connection(self):

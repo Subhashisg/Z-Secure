@@ -1,6 +1,6 @@
 @echo off
 echo ===============================================
-echo    EncryptPro v2 - Enterprise Image Security
+echo    Z-Secure - Enterprise Security Platform
 echo ===============================================
 echo.
 
@@ -28,7 +28,7 @@ echo [INFO] Checking camera permissions...
 echo Please allow camera access when prompted by your browser.
 echo.
 
-echo [INFO] Starting EncryptPro v2...
+echo [INFO] Starting Z-Secure...
 echo.
 echo The application will be available at:
 echo http://localhost:5000

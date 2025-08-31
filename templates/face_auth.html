@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Face Authentication - EncryptPro v2{% endblock %}
+{% block title %}Face Authentication - Z-Secure{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -19,13 +19,20 @@
                     
                     <div id="instructions" class="text-center">
                         <i class="fas fa-camera" style="font-size: 4rem; color: var(--warning-color); margin-bottom: 20px;"></i>
-                        <h5>Look at the Camera</h5>
+                        <h5>Biometric Authentication with Liveness Detection</h5>
                         <p class="text-muted">
                             Position your face in the camera for biometric verification.
-                            This will take just a few seconds.
+                            Please follow the liveness detection instructions:
                         </p>
+                        <div class="liveness-instructions mb-3">
+                            <small class="text-info">
+                                <i class="fas fa-eye me-1"></i> Blink naturally<br>
+                                <i class="fas fa-head-side-virus me-1"></i> Move your head slightly<br>
+                                <i class="fas fa-smile me-1"></i> Look directly at the camera
+                            </small>
+                        </div>
                         <button type="button" class="btn btn-warning" id="startAuthBtn">
-                            <i class="fas fa-camera me-2"></i>Start Authentication
+                            <i class="fas fa-camera me-2"></i>Start Liveness Authentication
                         </button>
                     </div>
                     
@@ -69,7 +76,7 @@
             <div class="card-body">
                 <h6 class="card-title">
                     <i class="fas fa-question-circle text-info me-2"></i>
-                    Having Trouble?
+                    Having Trouble with Liveness Detection?
                 </h6>
                 <ul class="list-unstyled mb-0">
                     <li class="mb-2">
@@ -79,6 +86,14 @@
                     <li class="mb-2">
                         <i class="fas fa-mobile-alt text-info me-2"></i>
                         Hold your device steady during capture
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-eye text-success me-2"></i>
+                        Blink naturally during authentication
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-head-side-virus text-primary me-2"></i>
+                        Make slight head movements to prove liveness
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-glasses text-danger me-2"></i>

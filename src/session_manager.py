@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 import sqlite3
 
 class SessionManager:
-    """Manage user sessions with short timeout"""
+    """Session management for Z-Secure authentication"""
     
-    def __init__(self, session_timeout=900):  # 15 minutes default
-        self.session_timeout = session_timeout
-        self.db_path = 'encryptpro.db'
+    def __init__(self):
+        self.sessions = {}
+        self.db_path = 'zsecure.db'
+        self.session_timeout = 900  # 15 minutes (900 seconds)
     
     def get_connection(self):
         """Get database connection"""
@@ -22,6 +23,8 @@ class SessionManager:
             session_id = secrets.token_urlsafe(32)
             expires_at = datetime.now() + timedelta(seconds=self.session_timeout)
             
+            print(f"Creating session for user {user_id}, expires at {expires_at}")
+            
             conn = self.get_connection()
             cursor = conn.cursor()
             
@@ -33,43 +36,49 @@ class SessionManager:
             conn.commit()
             conn.close()
             
+            print(f"Session {session_id} created successfully")
             return session_id
             
         except Exception as e:
             print(f"Error creating session: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def is_session_valid(self, session_id):
         """Check if session is valid and not expired"""
-        if not session_id:
-            return False
-        
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT expires_at, is_active FROM sessions 
-                WHERE id = ? AND is_active = 1
+                SELECT user_id, expires_at, last_activity 
+                FROM sessions 
+                WHERE id = ?
             ''', (session_id,))
             
-            session = cursor.fetchone()
+            result = cursor.fetchone()
             conn.close()
             
-            if not session:
-                return False
+            if not result:
+                print(f"Session {session_id} not found")
+                return False, None
             
-            # Check if expired
-            expires_at = datetime.fromisoformat(session['expires_at'])
+            user_id, expires_at_str, last_activity = result
+            expires_at = datetime.fromisoformat(expires_at_str)
+            
+            print(f"Session {session_id} for user {user_id}: expires at {expires_at}, current time {datetime.now()}")
+            
             if datetime.now() > expires_at:
-                self.invalidate_session(session_id)
-                return False
+                print(f"Session {session_id} has expired")
+                return False, user_id
             
-            return True
+            print(f"Session {session_id} is valid")
+            return True, user_id
             
         except Exception as e:
             print(f"Error validating session: {e}")
-            return False
+            return False, None
     
     def update_session_activity(self, session_id):
         """Update session last activity and extend expiration"""

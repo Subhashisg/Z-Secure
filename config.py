@@ -1,10 +1,10 @@
-# EncryptPro v2 Configuration
+# Z-Secure Configuration
 import os
 
 class Config:
     """Base configuration class"""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'encryptpro-v2-enterprise-security-key-2024'
-    DATABASE_PATH = os.environ.get('DATABASE_PATH') or 'encryptpro.db'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'zsecure-v3-enterprise-security-key-2025'
+    DATABASE_PATH = os.environ.get('DATABASE_PATH') or 'zsecure.db'
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or 'uploads'
     PROCESSED_FOLDER = os.environ.get('PROCESSED_FOLDER') or 'processed'
     FACE_DATA_FOLDER = os.environ.get('FACE_DATA_FOLDER') or 'face_data'

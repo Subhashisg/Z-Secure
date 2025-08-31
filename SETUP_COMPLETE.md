@@ -1,10 +1,10 @@
-## 🎉 EncryptPro v2 - Complete Enterprise Image Security Platform
+## 🎉 Z-Secure - Complete Enterprise Security Platform
 
 I've successfully created a comprehensive Flask-based web application for image encryption-decryption with advanced features! Here's what has been built:
 
 ### 🏗️ **Project Structure**
 ```
-EncryptPro_v2/
+Z-Secure/
 ├── app.py                 # Main Flask application
 ├── config.py              # Configuration management
 ├── requirements.txt       # Python dependencies
