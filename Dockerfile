@@ -20,5 +20,5 @@ RUN mkdir -p uploads processed face_data
 # Expose port
 EXPOSE 5000
 
-# Run the application with basic Flask server
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Run the application with gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "app:app"]
