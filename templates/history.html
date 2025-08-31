@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}Activity History - EncryptPro v2{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Activity History
+                    </h3>
+                    <p class="mb-0 mt-2">Complete log of your encryption/decryption operations</p>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-light btn-sm" onclick="exportHistory()">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                    <button type="button" class="btn btn-outline-light btn-sm" onclick="refreshHistory()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Filter Controls -->
+                <div class="row mb-4">
+                    <div class="col-lg-3">
+                        <label for="operationFilter" class="form-label">Operation Type</label>
+                        <select class="form-select" id="operationFilter">
+                            <option value="">All Operations</option>
+                            <option value="encryption">Encryption</option>
+                            <option value="decryption">Decryption</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-3">
+                        <label for="dateFrom" class="form-label">From Date</label>
+                        <input type="date" class="form-control" id="dateFrom">
+                    </div>
+                    <div class="col-lg-3">
+                        <label for="dateTo" class="form-label">To Date</label>
+                        <input type="date" class="form-control" id="dateTo">
+                    </div>
+                    <div class="col-lg-3">
+                        <label for="searchTerm" class="form-label">Search Files</label>
+                        <input type="text" class="form-control" id="searchTerm" placeholder="Search by filename...">
+                    </div>
+                </div>
+                
+                <!-- Statistics Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <i class="fas fa-list-alt" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2" id="totalOperations">{{ operations|length }}</h4>
+                                <small>Total Operations</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body text-center">
+                                <i class="fas fa-lock" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2" id="totalEncryptions">
+                                    {{ operations|selectattr("operation_type", "equalto", "encryption")|list|length }}
+                                </h4>
+                                <small>Encryptions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <i class="fas fa-unlock" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2" id="totalDecryptions">
+                                    {{ operations|selectattr("operation_type", "equalto", "decryption")|list|length }}
+                                </h4>
+                                <small>Decryptions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <i class="fas fa-calendar" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2" id="todayOperations">0</h4>
+                                <small>Today</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Operations Table -->
+                <div class="table-responsive">
+                    {% if operations %}
+                    <table class="table table-hover" id="historyTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>
+                                    <i class="fas fa-clock me-1"></i>
+                                    <button type="button" class="btn btn-sm btn-link text-white p-0" onclick="sortTable('timestamp')">
+                                        Timestamp
+                                        <i class="fas fa-sort"></i>
+                                    </button>
+                                </th>
+                                <th>
+                                    <i class="fas fa-cog me-1"></i>
+                                    <button type="button" class="btn btn-sm btn-link text-white p-0" onclick="sortTable('operation_type')">
+                                        Operation
+                                        <i class="fas fa-sort"></i>
+                                    </button>
+                                </th>
+                                <th>
+                                    <i class="fas fa-file me-1"></i>
+                                    <button type="button" class="btn btn-sm btn-link text-white p-0" onclick="sortTable('filename')">
+                                        Filename
+                                        <i class="fas fa-sort"></i>
+                                    </button>
+                                </th>
+                                <th>
+                                    <i class="fas fa-hdd me-1"></i>
+                                    <button type="button" class="btn btn-sm btn-link text-white p-0" onclick="sortTable('file_size')">
+                                        Size
+                                        <i class="fas fa-sort"></i>
+                                    </button>
+                                </th>
+                                <th>
+                                    <i class="fas fa-check-circle me-1"></i>
+                                    Status
+                                </th>
+                                <th>
+                                    <i class="fas fa-ellipsis-h me-1"></i>
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            {% for operation in operations %}
+                            <tr data-operation="{{ operation.operation_type }}" data-date="{{ operation.timestamp[:10] }}" data-filename="{{ operation.filename.lower() }}">
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span>{{ operation.timestamp[:16].replace('T', ' ') }}</span>
+                                        <small class="text-muted">{{ moment(operation.timestamp).fromNow() if moment else '' }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if operation.operation_type == 'encryption' %}
+                                        <span class="encryption-indicator encrypted">
+                                            <i class="fas fa-lock me-1"></i>Encryption
+                                        </span>
+                                    {% else %}
+                                        <span class="encryption-indicator decrypted">
+                                            <i class="fas fa-unlock me-1"></i>Decryption
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-image text-primary me-2"></i>
+                                        <span class="text-truncate" style="max-width: 200px;" title="{{ operation.filename }}">
+                                            {{ operation.filename }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if operation.file_size %}
+                                        {{ (operation.file_size / 1024 / 1024) | round(2) }} MB
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if operation.success %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Success
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i>Failed
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                onclick="showOperationDetails('{{ operation.filename }}', '{{ operation.operation_type }}', '{{ operation.timestamp }}')">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                        {% if operation.error_message %}
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="showErrorDetails('{{ operation.error_message }}')">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-history text-muted" style="font-size: 4rem;"></i>
+                        <h4 class="text-muted mt-3">No Activity Found</h4>
+                        <p class="text-muted">Start by uploading and processing some images to see your activity history.</p>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Upload Image
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Pagination -->
+                {% if operations|length > 0 %}
+                <nav aria-label="History pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1">Previous</a>
+                        </li>
+                        <li class="page-item active">
+                            <a class="page-link" href="#">1</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">2</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">3</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Operation Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailsModalLabel">
+                    <i class="fas fa-info-circle me-2"></i>Operation Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="operationDetails"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize filters
+    setupFilters();
+    calculateTodayOperations();
+    
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateTo').value = today;
+    
+    // Set one week ago as default from date
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    document.getElementById('dateFrom').value = oneWeekAgo.toISOString().split('T')[0];
+});
+
+function setupFilters() {
+    const operationFilter = document.getElementById('operationFilter');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    const searchTerm = document.getElementById('searchTerm');
+    
+    [operationFilter, dateFrom, dateTo, searchTerm].forEach(element => {
+        element.addEventListener('change', filterTable);
+        element.addEventListener('input', filterTable);
+    });
+}
+
+function filterTable() {
+    const operationFilter = document.getElementById('operationFilter').value.toLowerCase();
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    const searchTerm = document.getElementById('searchTerm').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('#historyTableBody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const operation = row.dataset.operation;
+        const date = row.dataset.date;
+        const filename = row.dataset.filename;
+        
+        let show = true;
+        
+        // Filter by operation type
+        if (operationFilter && operation !== operationFilter) {
+            show = false;
+        }
+        
+        // Filter by date range
+        if (dateFrom && date < dateFrom) {
+            show = false;
+        }
+        if (dateTo && date > dateTo) {
+            show = false;
+        }
+        
+        // Filter by filename
+        if (searchTerm && !filename.includes(searchTerm)) {
+            show = false;
+        }
+        
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+    
+    // Update results count
+    updateResultsCount(visibleCount);
+}
+
+function updateResultsCount(count) {
+    const totalOperations = document.getElementById('totalOperations');
+    if (totalOperations) {
+        totalOperations.textContent = count;
+    }
+}
+
+function calculateTodayOperations() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayRows = document.querySelectorAll(`#historyTableBody tr[data-date="${today}"]`);
+    document.getElementById('todayOperations').textContent = todayRows.length;
+}
+
+function sortTable(column) {
+    const table = document.getElementById('historyTable');
+    const tbody = document.getElementById('historyTableBody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Toggle sort direction
+    const currentSort = table.dataset.sortColumn;
+    const currentDirection = table.dataset.sortDirection || 'asc';
+    const newDirection = (currentSort === column && currentDirection === 'asc') ? 'desc' : 'asc';
+    
+    table.dataset.sortColumn = column;
+    table.dataset.sortDirection = newDirection;
+    
+    rows.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch (column) {
+            case 'timestamp':
+                aVal = new Date(a.children[0].querySelector('span').textContent);
+                bVal = new Date(b.children[0].querySelector('span').textContent);
+                break;
+            case 'operation_type':
+                aVal = a.dataset.operation;
+                bVal = b.dataset.operation;
+                break;
+            case 'filename':
+                aVal = a.dataset.filename;
+                bVal = b.dataset.filename;
+                break;
+            case 'file_size':
+                aVal = parseFloat(a.children[3].textContent) || 0;
+                bVal = parseFloat(b.children[3].textContent) || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (aVal < bVal) return newDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return newDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    // Clear tbody and append sorted rows
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort indicators
+    updateSortIndicators(column, newDirection);
+}
+
+function updateSortIndicators(activeColumn, direction) {
+    document.querySelectorAll('th button i.fa-sort, th button i.fa-sort-up, th button i.fa-sort-down').forEach(icon => {
+        icon.className = 'fas fa-sort';
+    });
+    
+    const activeButton = document.querySelector(`th button[onclick="sortTable('${activeColumn}')"] i`);
+    if (activeButton) {
+        activeButton.className = `fas fa-sort-${direction === 'asc' ? 'up' : 'down'}`;
+    }
+}
+
+function showOperationDetails(filename, operation, timestamp) {
+    const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    const operationIcon = operation === 'encryption' ? 'fa-lock text-danger' : 'fa-unlock text-success';
+    const operationColor = operation === 'encryption' ? 'danger' : 'success';
+    
+    document.getElementById('operationDetails').innerHTML = `
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-${operationColor}">
+                    <div class="card-header bg-${operationColor} text-white">
+                        <h6 class="mb-0">
+                            <i class="fas ${operationIcon} me-2"></i>
+                            ${operation.charAt(0).toUpperCase() + operation.slice(1)} Operation
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-3">Filename:</dt>
+                            <dd class="col-sm-9">${filename}</dd>
+                            
+                            <dt class="col-sm-3">Operation:</dt>
+                            <dd class="col-sm-9">
+                                <span class="encryption-indicator ${operation === 'encryption' ? 'encrypted' : 'decrypted'}">
+                                    ${operation.charAt(0).toUpperCase() + operation.slice(1)}
+                                </span>
+                            </dd>
+                            
+                            <dt class="col-sm-3">Timestamp:</dt>
+                            <dd class="col-sm-9">${new Date(timestamp).toLocaleString()}</dd>
+                            
+                            <dt class="col-sm-3">Algorithm:</dt>
+                            <dd class="col-sm-9">Z-Secure v2 with Biometric Key Derivation</dd>
+                            
+                            <dt class="col-sm-3">Security Level:</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-primary">Enterprise Grade</span>
+                                <span class="badge bg-info">256-bit AES</span>
+                                <span class="badge bg-warning text-dark">Chaos Enhanced</span>
+                            </dd>
+                            
+                            <dt class="col-sm-3">Key Source:</dt>
+                            <dd class="col-sm-9">Facial Biometric + Email Hash</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+}
+
+function showErrorDetails(errorMessage) {
+    alert('Error Details:\n\n' + errorMessage);
+}
+
+function exportHistory() {
+    // Get filtered data
+    const visibleRows = Array.from(document.querySelectorAll('#historyTableBody tr')).filter(row => row.style.display !== 'none');
+    
+    if (visibleRows.length === 0) {
+        alert('No data to export. Please adjust your filters.');
+        return;
+    }
+    
+    // Create CSV content
+    let csvContent = 'Timestamp,Operation,Filename,Size (MB),Status\n';
+    
+    visibleRows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const timestamp = cells[0].querySelector('span').textContent;
+        const operation = row.dataset.operation;
+        const filename = cells[2].querySelector('span').textContent;
+        const size = cells[3].textContent.replace(' MB', '');
+        const status = cells[4].querySelector('.badge').textContent.trim();
+        
+        csvContent += `"${timestamp}","${operation}","${filename}","${size}","${status}"\n`;
+    });
+    
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `encryptpro_history_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function refreshHistory() {
+    location.reload();
+}
+</script>
+{% endblock %}

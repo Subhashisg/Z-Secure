@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Face Authentication - EncryptPro v2{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header text-center bg-warning text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-user-shield me-2"></i>Facial Authentication
+                </h3>
+                <p class="mb-0 mt-2">Verify your identity to complete sign in</p>
+            </div>
+            <div class="card-body p-5">
+                <div class="face-capture-area" id="captureArea">
+                    <video id="video" autoplay muted style="display: none; width: 100%; max-width: 400px; border-radius: 10px;"></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    
+                    <div id="instructions" class="text-center">
+                        <i class="fas fa-camera" style="font-size: 4rem; color: var(--warning-color); margin-bottom: 20px;"></i>
+                        <h5>Look at the Camera</h5>
+                        <p class="text-muted">
+                            Position your face in the camera for biometric verification.
+                            This will take just a few seconds.
+                        </p>
+                        <button type="button" class="btn btn-warning" id="startAuthBtn">
+                            <i class="fas fa-camera me-2"></i>Start Authentication
+                        </button>
+                    </div>
+                    
+                    <div id="processing" style="display: none;" class="text-center">
+                        <div class="spinner-border text-warning mb-3" role="status"></div>
+                        <h5>Processing...</h5>
+                        <p class="text-muted">Verifying your biometric data</p>
+                    </div>
+                    
+                    <div id="authComplete" style="display: none;" class="text-center">
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem; margin-bottom: 20px;"></i>
+                        <h5 class="text-success">Authentication Successful!</h5>
+                        <p class="text-muted">Redirecting to your dashboard...</p>
+                    </div>
+                    
+                    <div id="authFailed" style="display: none;" class="text-center">
+                        <i class="fas fa-times-circle text-danger" style="font-size: 4rem; margin-bottom: 20px;"></i>
+                        <h5 class="text-danger">Authentication Failed</h5>
+                        <p class="text-muted" id="errorMessage">Please try again or contact support if the issue persists.</p>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-warning" id="retryAuthBtn">
+                                <i class="fas fa-redo me-2"></i>Try Again
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="window.location.href='{{ url_for('login') }}'">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Login
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Login
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Help Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title">
+                    <i class="fas fa-question-circle text-info me-2"></i>
+                    Having Trouble?
+                </h6>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-lightbulb text-warning me-2"></i>
+                        Ensure your face is well-lit and visible
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-mobile-alt text-info me-2"></i>
+                        Hold your device steady during capture
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-glasses text-danger me-2"></i>
+                        If you wore glasses during registration, wear them now
+                    </li>
+                    <li>
+                        <i class="fas fa-life-ring text-primary me-2"></i>
+                        <a href="#" class="text-primary">Contact Support</a> if authentication keeps failing
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form for authentication -->
+<form id="authForm" method="POST" action="{{ url_for('authenticate_face') }}" style="display: none;">
+    <input type="hidden" name="user_id" value="{{ user_id }}">
+    <input type="hidden" name="face_data" id="faceDataInput">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startAuthBtn = document.getElementById('startAuthBtn');
+    const retryAuthBtn = document.getElementById('retryAuthBtn');
+    const instructions = document.getElementById('instructions');
+    const processing = document.getElementById('processing');
+    const authComplete = document.getElementById('authComplete');
+    const authFailed = document.getElementById('authFailed');
+    const authForm = document.getElementById('authForm');
+    const faceDataInput = document.getElementById('faceDataInput');
+    
+    let stream = null;
+    let authTimeout = null;
+    
+    function startAuthentication() {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 640 }, 
+                height: { ideal: 480 },
+                facingMode: 'user'
+            } 
+        })
+        .then(function(mediaStream) {
+            stream = mediaStream;
+            video.srcObject = stream;
+            video.style.display = 'block';
+            instructions.style.display = 'none';
+            
+            // Set canvas size
+            canvas.width = 640;
+            canvas.height = 480;
+            
+            // Auto-capture after 3 seconds, with retry logic
+            setTimeout(function() {
+                captureAndAuthenticate();
+            }, 4000); // Increased to 4 seconds for better positioning
+        })
+        .catch(function(err) {
+            console.error('Camera error:', err);
+            showAuthFailed('Camera access denied. Please allow camera permission and try again.');
+        });
+    }
+    
+    function captureAndAuthenticate() {
+        if (!stream) return;
+        
+        // Show processing state
+        video.style.display = 'none';
+        processing.style.display = 'block';
+        
+        // Draw video frame to canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert to base64 with higher quality
+        const capturedData = canvas.toDataURL('image/jpeg', 0.95); // Increased quality
+        
+        // Stop video stream
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        
+        // Submit for authentication
+        faceDataInput.value = capturedData;
+        
+        const formData = new FormData(authForm);
+        
+        fetch(authForm.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            processing.style.display = 'none';
+            
+            if (data.success) {
+                showAuthSuccess();
+                // Redirect after 2 seconds
+                setTimeout(function() {
+                    window.location.href = data.redirect;
+                }, 2000);
+            } else {
+                showAuthFailed(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Authentication error:', error);
+            processing.style.display = 'none';
+            showAuthFailed('Authentication failed. Please try again.');
+        });
+    }
+    
+    function showAuthSuccess() {
+        authComplete.style.display = 'block';
+        authFailed.style.display = 'none';
+    }
+    
+    function showAuthFailed(message) {
+        authFailed.style.display = 'block';
+        authComplete.style.display = 'none';
+        
+        // Update error message
+        const errorMessageElement = authFailed.querySelector('#errorMessage');
+        if (message) {
+            errorMessageElement.textContent = message;
+        } else {
+            errorMessageElement.textContent = 'Please try again or contact support if the issue persists.';
+        }
+    }
+    
+    function resetAuth() {
+        instructions.style.display = 'block';
+        processing.style.display = 'none';
+        authComplete.style.display = 'none';
+        authFailed.style.display = 'none';
+        video.style.display = 'none';
+        
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+    }
+    
+    // Event listeners
+    startAuthBtn.addEventListener('click', startAuthentication);
+    retryAuthBtn.addEventListener('click', function() {
+        resetAuth();
+        startAuthentication();
+    });
+    
+    // Auto-start authentication after page load
+    setTimeout(function() {
+        if (!stream) {
+            startAuthentication();
+        }
+    }, 1000);
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    });
+    
+    // Add session timeout warning for auth page
+    let authTimeoutWarning = setTimeout(function() {
+        alert('Authentication session will expire soon. Please complete authentication.');
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    // Clear timeout if auth is successful
+    document.addEventListener('auth_success', function() {
+        clearTimeout(authTimeoutWarning);
+    });
+});
+</script>
+{% endblock %}
