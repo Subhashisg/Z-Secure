@@ -19,6 +19,44 @@ Z-Secure is an enterprise-grade biometric security platform that combines advanc
 - **Biometric Key Derivation**: Encryption keys derived from unique facial characteristics
 - **Anti-Spoofing Protection**: Prevents photo, video, and mask attacks
 
+## 🛠️ Technical Stack
+
+### **Backend**
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| Python | 3.11+ | Core language |
+| Flask | 2.3.3 | Web framework |
+| Gunicorn | 21.2.0 | Production server |
+| SQLite | 3 | Database |
+
+### **Security & Encryption**
+| Technology | Purpose |
+|-----------|---------|
+| Cryptography 41.0.7 | Encryption operations |
+| AES-256 | File encryption |
+| SHA-256 | Secure hashing |
+| PBKDF2 | Key derivation |
+
+### **Image Processing**
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| Pillow | 9.5.0 | Image manipulation |
+| NumPy | 1.24.3 | Numerical computing |
+| OpenCV* | 4.8.1.78 | Computer vision (optional) |
+| MediaPipe* | 0.10.7 | Face detection (optional) |
+
+*Optional dependencies for advanced features
+
+### **Frontend**
+- HTML5, CSS3, JavaScript (ES6+)
+- Bootstrap 5 for responsive UI
+- Font Awesome icons
+- WebRTC for camera access
+
+📖 **[View Complete Technical Documentation →](./TECHNICAL_README.md)**
+
+## ✨ Key Features
+
 ### 🛡️ **Z-Secure Encryption**
 - **Chaos-Based Algorithm**: Lorenz attractor implementation for key generation
 - **256-bit AES Encryption**: Industry-standard encryption with biometric enhancement
